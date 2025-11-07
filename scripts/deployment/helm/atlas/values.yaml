@@ -1,0 +1,126 @@
+# Global / common
+app:
+  # Used for service naming and NGINX upstream prefixes
+  name: atlas
+
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+
+# Image pull secret (private registries). Either create via this chart or reference existing.
+imagePullSecret:
+  create: true
+  name: regcred
+  registry: ghcr.io
+  username: ""
+  password: ""
+  email: ""
+
+# Additional imagePullSecrets to attach to ServiceAccounts/Pods
+imagePullSecrets:
+  - name: regcred
+
+images:
+  mainApp:
+    repository: ghcr.io/sandialabs/atlas-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  authApp:
+    repository: ghcr.io/sandialabs/atlas-auth
+    tag: latest
+    pullPolicy: IfNotPresent
+  nginx:
+    repository: nginxinc/nginx-unprivileged
+    tag: "1.27-alpine"
+    pullPolicy: IfNotPresent
+  minio:
+    repository: quay.io/minio/minio
+    tag: RELEASE.2025-10-01T00-00-00Z
+    pullPolicy: IfNotPresent
+
+replicaCount:
+  mainApp: 1
+  authApp: 1
+  nginx: 1
+  minio: 1
+
+service:
+  mainApp:
+    port: 8000
+  authApp:
+    port: 5000
+  nginx:
+    type: ClusterIP
+    port: 8080
+  minio:
+    apiPort: 9000
+    consolePort: 9001
+
+route:
+  enabled: true
+  host: ""     # leave empty to auto-generate by OpenShift
+  tls:
+    enabled: true
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
+
+# Common pod template knobs
+pod:
+  annotations: {}
+  labels: {}
+  # OpenShift: run as non-root arbitrary UID
+  securityContext:
+    runAsNonRoot: true
+    # do NOT set runAsUser to allow arbitrary UID on OpenShift
+
+resources:
+  mainApp: {}
+  authApp: {}
+  nginx: {}
+  minio: {}
+
+# Environment for the applications
+mainApp:
+  env: []   # e.g., - name: LOG_LEVEL\n    #        value: info
+
+authApp:
+  env: []
+
+nginx:
+  # Extra annotations on the nginx service
+  serviceAnnotations: {}
+
+# S3/MinIO wiring
+s3:
+  bucket: atlas
+  region: us-east-1
+  pathStyle: true
+  useMinio: true
+  external:
+    enabled: false
+    endpoint: https://s3.amazonaws.com
+    # reference to an existing secret containing access/secret
+    accessKeySecretName: s3-credentials
+    accessKeyKey: accessKey
+    secretKeyKey: secretKey
+
+minio:
+  enabled: true
+  # Credentials for MinIO (also exposed to apps via an internal Secret)
+  rootUser: minioadmin
+  rootPassword: minioadmin
+  persistence:
+    enabled: true
+    existingClaim: ""
+    size: 10Gi
+    storageClass: ""
+  # Additional environment entries for MinIO container
+  env: []
+
+# Node selectors / tolerations / affinity (optional)
+nodeSelector: {}
+tolerations: []
+affinity: {}

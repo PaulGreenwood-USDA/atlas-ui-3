@@ -1,0 +1,64 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atlas.svc.auth" . }}
+  labels:
+    {{- include "atlas.labels" . | nindent 4 }}
+    component: auth-app
+spec:
+  replicas: {{ .Values.replicaCount.authApp }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      component: auth-app
+  template:
+    metadata:
+      labels:
+        {{- include "atlas.labels" . | nindent 8 }}
+        component: auth-app
+    spec:
+      serviceAccountName: {{ default (include "atlas.fullname" .) .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.pod.securityContext | nindent 8 }}
+      containers:
+        - name: auth-app
+          image: "{{ .Values.images.authApp.repository }}:{{ .Values.images.authApp.tag }}"
+          imagePullPolicy: {{ .Values.images.authApp.pullPolicy }}
+          ports:
+            - containerPort: {{ .Values.service.authApp.port }}
+              name: http
+          envFrom:
+            - configMapRef:
+                name: {{ include "atlas.fullname" . }}-env
+          env:
+            - name: S3_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ternary (printf "%s-s3" (include "atlas.fullname" .)) .Values.s3.external.accessKeySecretName .Values.s3.useMinio }}
+                  key: accessKey
+            - name: S3_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ ternary (printf "%s-s3" (include "atlas.fullname" .)) .Values.s3.external.accessKeySecretName .Values.s3.useMinio }}
+                  key: secretKey
+            {{- if .Values.authApp.env }}
+            {{- toYaml .Values.authApp.env | nindent 12 }}
+            {{- end }}
+          resources:
+            {{- toYaml .Values.resources.authApp | nindent 12 }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      imagePullSecrets:
+        {{- range .Values.imagePullSecrets }}
+        - name: {{ .name }}
+        {{- end }}

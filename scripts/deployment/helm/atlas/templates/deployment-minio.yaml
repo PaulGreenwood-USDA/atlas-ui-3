@@ -1,0 +1,95 @@
+{{- if .Values.minio.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "atlas.svc.minio" . }}
+  labels:
+    {{- include "atlas.labels" . | nindent 4 }}
+    component: minio
+spec:
+  replicas: {{ .Values.replicaCount.minio }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      component: minio
+  template:
+    metadata:
+      labels:
+        {{- include "atlas.labels" . | nindent 8 }}
+        component: minio
+    spec:
+      serviceAccountName: {{ default (include "atlas.fullname" .) .Values.serviceAccount.name }}
+      securityContext:
+        {{- toYaml .Values.pod.securityContext | nindent 8 }}
+      containers:
+        - name: minio
+          image: "{{ .Values.images.minio.repository }}:{{ .Values.images.minio.tag }}"
+          imagePullPolicy: {{ .Values.images.minio.pullPolicy }}
+          args:
+            - server
+            - /data
+            - --console-address=:{{ .Values.service.minio.consolePort }}
+          env:
+            - name: MINIO_ROOT_USER
+              value: {{ .Values.minio.rootUser | quote }}
+            - name: MINIO_ROOT_PASSWORD
+              value: {{ .Values.minio.rootPassword | quote }}
+            {{- if .Values.minio.env }}
+            {{- toYaml .Values.minio.env | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: api
+              containerPort: {{ .Values.service.minio.apiPort }}
+            - name: console
+              containerPort: {{ .Values.service.minio.consolePort }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /minio/health/ready
+              port: api
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /minio/health/live
+              port: api
+            initialDelaySeconds: 20
+            periodSeconds: 20
+      volumes:
+        - name: data
+          {{- if and .Values.minio.persistence.enabled .Values.minio.persistence.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.minio.persistence.existingClaim }}
+          {{- else if .Values.minio.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "atlas.svc.minio" . }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+      imagePullSecrets:
+        {{- range .Values.imagePullSecrets }}
+        - name: {{ .name }}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "atlas.svc.minio" . }}
+  labels:
+    {{- include "atlas.labels" . | nindent 4 }}
+    component: minio
+spec:
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    component: minio
+  ports:
+    - name: api
+      port: {{ .Values.service.minio.apiPort }}
+      targetPort: api
+    - name: console
+      port: {{ .Values.service.minio.consolePort }}
+      targetPort: console
+  type: ClusterIP
+{{- end }}

@@ -1,0 +1,22 @@
+apiVersion: v2
+name: atlas
+description: Atlas UI 3 application stack (main app, auth app, nginx gateway, optional MinIO) for OpenShift
+kubeVersion: ">=1.25.0"
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+description: Atlas UI & API multi-deployment chart (main, auth, nginx, optional MinIO) tuned for OpenShift Routes.
+keywords:
+  - atlas
+  - openshift
+  - fastapi
+  - nginx
+  - minio
+home: https://github.com/sandialabs/atlas-ui-3
+sources:
+  - https://github.com/sandialabs/atlas-ui-3
+maintainers:
+  - name: atlas-team
+    email: example@sandialabs.com
+annotations:
+  category: ai-app

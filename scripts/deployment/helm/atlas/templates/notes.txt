@@ -1,0 +1,29 @@
+Thank you for installing the Atlas chart.
+
+Main components deployed:
+- Main App Deployment: {{ include "atlas.svc.main" . }}
+- Auth App Deployment: {{ include "atlas.svc.auth" . }}
+- NGINX Deployment & Service: {{ include "atlas.svc.nginx" . }} (port {{ .Values.service.nginx.port }})
+{{- if .Values.minio.enabled }}
+- MinIO Deployment & Service: {{ include "atlas.svc.minio" . }} (API {{ .Values.service.minio.apiPort }}, Console {{ .Values.service.minio.consolePort }})
+{{- end }}
+
+Access:
+{{- if .Values.route.enabled }}
+OpenShift Route (external): {{ if .Values.route.host }}https://{{ .Values.route.host }}{{ else }}(cluster generated){{ end }}
+{{- else }}
+No Route created. Enable with values.route.enabled=true
+{{- end }}
+
+S3 wiring:
+{{- if .Values.s3.useMinio }}
+Using internal MinIO credentials (Secret: {{ include "atlas.fullname" . }}-s3)
+Endpoint: http://{{ include "atlas.svc.minio" . }}:{{ .Values.service.minio.apiPort }}
+{{- else if .Values.s3.external.enabled }}
+External S3 endpoint: {{ .Values.s3.external.endpoint }} (secret: {{ .Values.s3.external.accessKeySecretName }})
+{{- end }}
+
+Next steps:
+1. kubectl get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+2. Check Route once admitted.
+3. Update values and run `helm upgrade` as needed.
