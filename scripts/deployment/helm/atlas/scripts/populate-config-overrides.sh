@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# This helper populates the chart's ConfigMap data from local config/overrides directory
+# This helper generates a Helm template YAML for a ConfigMap from local config/overrides directory
+# and writes it under templates/configmap-config-overrides-generated.yaml for inclusion in the chart.
+#
 # Usage:
-#   ./scripts/deployment/helm/atlas/scripts/populate-config-overrides.sh <release-name> <namespace>
-# It will create/replace a ConfigMap named <release>-atlas-config-overrides with file entries.
-# Requires: kubectl/oc, yq (optional for merging), bash.
+#   ./scripts/deployment/helm/atlas/scripts/populate-config-overrides.sh <release-name> <namespace> [path-to-overrides]
+#
+# It will create/overwrite templates/configmap-config-overrides-generated.yaml with file entries.
+# You can commit this file or keep it untracked depending on your workflow.
 
 if [[ $# -lt 2 ]]; then
   echo "Usage: $0 <release-name> <namespace> [path-to-overrides]" >&2
@@ -25,17 +28,17 @@ fi
 
 echo "Building ConfigMap $CM_NAME from $OVERRIDES_DIR"
 
-tmpfile=$(mktemp)
-cat > "$tmpfile" <<EOF
+OUT_FILE="scripts/deployment/helm/atlas/templates/configmap-config-overrides-generated.yaml"
+mkdir -p "$(dirname "$OUT_FILE")"
+cat > "$OUT_FILE" <<EOF
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: $CM_NAME
-  namespace: $NAMESPACE
   labels:
     app.kubernetes.io/instance: $RELEASE
     app.kubernetes.io/name: $CHART_NAME
-    managed-by: populate-script
+    managed-by: populate-config-overrides.sh
     component: config-overrides
 data:
 EOF
@@ -46,18 +49,11 @@ while IFS= read -r -d '' file; do
   rel="${rel#${OVERRIDES_DIR}/}"   # relative path inside overrides dir
   key=$(echo "$rel" | tr '/' '_' )
   echo "  Adding $file as key $key"
-  printf "  %s: |\n" "$key" >> "$tmpfile"
-  sed 's/^/    /' "$file" >> "$tmpfile"
-  echo >> "$tmpfile"
+  printf "  %s: |\n" "$key" >> "$OUT_FILE"
+  sed 's/^/    /' "$file" >> "$OUT_FILE"
+  echo >> "$OUT_FILE"
 done < <(find "$OVERRIDES_DIR" -type f -print0)
 
-echo "Applying ConfigMap..."
-# Use oc if present else kubectl
-if command -v oc >/dev/null 2>&1; then
-  oc apply -f "$tmpfile"
-else
-  kubectl apply -f "$tmpfile"
-fi
-
-echo "Done. Mounted at /app/config/overrides when chart installed with configOverrides.enabled=true."
-rm "$tmpfile"
+echo "Wrote ConfigMap template: $OUT_FILE"
+echo "Next: helm upgrade --install $RELEASE ./scripts/deployment/helm/atlas"
+echo "Mounted at /app/config/overrides when installed with configOverrides.enabled=true."

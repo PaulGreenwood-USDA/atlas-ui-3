@@ -21,6 +21,15 @@ Common template helpers
 {{- define "atlas.svc.nginx" -}}{{ include "atlas.fullname" . }}-nginx{{- end -}}
 {{- define "atlas.svc.minio" -}}{{ include "atlas.fullname" . }}-minio{{- end -}}
 
+{{- /* nginx configmap name: prefer external provided name */ -}}
+{{- define "atlas.nginx.configmap" -}}
+{{- if .Values.nginx.configMapName -}}
+{{- .Values.nginx.configMapName -}}
+{{- else -}}
+{{ include "atlas.svc.nginx" . }}-conf
+{{- end -}}
+{{- end -}}
+
 {{- /* selector labels */ -}}
 {{- define "atlas.labels" -}}
 app.kubernetes.io/name: {{ include "atlas.name" . }}

@@ -92,6 +92,9 @@ authApp:
 nginx:
   # Extra annotations on the nginx service
   serviceAnnotations: {}
+  # External ConfigMap support: set to use a pre-created ConfigMap instead of chart-managed one
+  configMapName: ""   # e.g., <release>-atlas-nginx-conf
+  configKey: "default.conf"
 
 # S3/MinIO wiring
 s3:

@@ -119,3 +119,30 @@ kubectl rollout restart deployment/atlas-atlas-auth-app -n atlas
 - File names are flattened: subdirectories use `_` in the key (e.g. `subdir_settings.yml`).
 - If you supply `configOverrides.existingConfigMap`, the script can still manage that name—pass the same release name and ensure the chart mounts it.
 
+## Manage NGINX config externally (no YAML editing)
+
+By default, the chart bundles an NGINX config as a ConfigMap. If you prefer to edit a plain file and not touch chart YAML, create an external ConfigMap and point the chart at it.
+
+### Script: `scripts/deployment/helm/atlas/scripts/populate-nginx-config.sh`
+
+Usage:
+```bash
+./scripts/deployment/helm/atlas/scripts/populate-nginx-config.sh <release> <namespace> [config-file]
+```
+
+Defaults:
+- ConfigMap name: `<release>-atlas-nginx-conf`
+- Config key: `default.conf` (override by env NGINX_CONFIG_KEY)
+- Source file: `scripts/deployment/helm/atlas/nginx/default.conf`
+
+Install or upgrade Helm to use the external ConfigMap:
+```bash
+helm upgrade --install atlas ./scripts/deployment/helm/atlas \
+  --set nginx.configMapName=atlas-atlas-nginx-conf \
+  --set nginx.configKey=default.conf
+```
+
+Notes:
+- When `nginx.configMapName` is set, the chart will not create its own NGINX ConfigMap.
+- You can keep your NGINX config versioned alongside the repo and update it with the script.
+

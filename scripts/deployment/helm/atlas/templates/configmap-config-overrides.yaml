@@ -1,12 +1,3 @@
-{{- if and .Values.configOverrides.enabled (not .Values.configOverrides.existingConfigMap) }}
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ include "atlas.fullname" . }}-config-overrides
-  labels:
-    {{- include "atlas.labels" . | nindent 4 }}
-data:
-  # Populate with key=value pairs or full file contents using Helm values if needed.
-  # For now this is a placeholder. You can patch this with environment-specific overrides.
-  README: "Place configuration override files here."
-{{- end }}
+# Placeholder removed: use scripts/populate-config-overrides.sh to generate a concrete
+# ConfigMap template file (configmap-config-overrides-generated.yaml) with actual data.
+# This file intentionally does nothing to avoid duplicate ConfigMap names.
