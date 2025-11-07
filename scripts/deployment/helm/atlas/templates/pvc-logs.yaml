@@ -1,0 +1,19 @@
+{{- if and .Values.logs.enabled (not .Values.logs.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "atlas.fullname" . }}-logs
+  labels:
+    {{- include "atlas.labels" . | nindent 4 }}
+spec:
+  accessModes:
+{{- range .Values.logs.accessModes }}
+    - {{ . }}
+{{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.logs.size }}
+  {{- if .Values.logs.storageClass }}
+  storageClassName: {{ .Values.logs.storageClass }}
+  {{- end }}
+{{- end }}

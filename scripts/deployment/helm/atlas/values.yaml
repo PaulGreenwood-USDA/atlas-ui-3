@@ -124,3 +124,30 @@ minio:
 nodeSelector: {}
 tolerations: []
 affinity: {}
+
+# Application logs volume (PVC)
+logs:
+  enabled: true
+  mountPath: /app/backend/logs
+  existingClaim: ""
+  size: 5Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+
+# Runtime feedback storage (PVC)
+feedback:
+  enabled: true
+  mountPath: /app/backend/runtime/feedback
+  existingClaim: ""
+  size: 1Gi
+  storageClass: ""
+  accessModes:
+    - ReadWriteOnce
+
+# Config overrides from repo/config/overrides mounted into the pods
+configOverrides:
+  enabled: true
+  mountPath: /app/config/overrides
+  # If you already created a ConfigMap externally, set its name here; chart will not create one
+  existingConfigMap: ""

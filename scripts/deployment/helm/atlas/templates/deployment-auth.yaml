@@ -44,6 +44,19 @@ spec:
             {{- if .Values.authApp.env }}
             {{- toYaml .Values.authApp.env | nindent 12 }}
             {{- end }}
+          volumeMounts:
+            {{- if .Values.logs.enabled }}
+            - name: logs
+              mountPath: {{ .Values.logs.mountPath }}
+            {{- end }}
+            {{- if .Values.feedback.enabled }}
+            - name: feedback
+              mountPath: {{ .Values.feedback.mountPath }}
+            {{- end }}
+            {{- if .Values.configOverrides.enabled }}
+            - name: config-overrides
+              mountPath: {{ .Values.configOverrides.mountPath }}
+            {{- end }}
           resources:
             {{- toYaml .Values.resources.authApp | nindent 12 }}
           readinessProbe:
@@ -61,4 +74,30 @@ spec:
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - name: {{ .name }}
+        {{- end }}
+      volumes:
+        {{- if .Values.logs.enabled }}
+        - name: logs
+          {{- if .Values.logs.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.logs.existingClaim }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ include "atlas.fullname" . }}-logs
+          {{- end }}
+        {{- end }}
+        {{- if .Values.feedback.enabled }}
+        - name: feedback
+          {{- if .Values.feedback.existingClaim }}
+          persistentVolumeClaim:
+            claimName: {{ .Values.feedback.existingClaim }}
+          {{- else }}
+          persistentVolumeClaim:
+            claimName: {{ include "atlas.fullname" . }}-feedback
+          {{- end }}
+        {{- end }}
+        {{- if .Values.configOverrides.enabled }}
+        - name: config-overrides
+          configMap:
+            name: {{ default (printf "%s-config-overrides" (include "atlas.fullname" .)) .Values.configOverrides.existingConfigMap }}
         {{- end }}

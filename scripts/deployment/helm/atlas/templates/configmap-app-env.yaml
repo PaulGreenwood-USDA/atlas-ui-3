@@ -9,3 +9,6 @@ data:
   S3_REGION: {{ .Values.s3.region | quote }}
   S3_PATH_STYLE: {{ ternary "true" "false" .Values.s3.pathStyle | quote }}
   S3_ENDPOINT: {{ ternary (printf "http://%s:%d" (include "atlas.svc.minio" .) .Values.service.minio.apiPort) .Values.s3.external.endpoint .Values.s3.useMinio | quote }}
+  APP_CONFIG_OVERRIDES: {{ .Values.configOverrides.mountPath | quote }}
+  APP_LOG_DIR: {{ .Values.logs.mountPath | quote }}
+  RUNTIME_FEEDBACK_DIR: {{ .Values.feedback.mountPath | quote }}

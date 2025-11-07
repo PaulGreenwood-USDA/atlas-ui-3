@@ -1,0 +1,19 @@
+{{- if and .Values.feedback.enabled (not .Values.feedback.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "atlas.fullname" . }}-feedback
+  labels:
+    {{- include "atlas.labels" . | nindent 4 }}
+spec:
+  accessModes:
+{{- range .Values.feedback.accessModes }}
+    - {{ . }}
+{{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.feedback.size }}
+  {{- if .Values.feedback.storageClass }}
+  storageClassName: {{ .Values.feedback.storageClass }}
+  {{- end }}
+{{- end }}
