@@ -85,7 +85,7 @@ function Stop-Processes {
 function Clear-Logs {
     Write-Host "Clearing log for fresh start"
     New-Item -ItemType Directory -Path "$PROJECT_ROOT/logs" -Force | Out-Null
-    "NEW LOG" | Out-File -FilePath "$PROJECT_ROOT/logs/app.jsonl"
+    "NEW LOG" | Out-File -FilePath "$PROJECT_ROOT/logs/app.jsonl" -Encoding UTF8
 }
 
 # =============================================================================
