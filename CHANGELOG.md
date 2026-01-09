@@ -6,21 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
-### 2026-01-09 - Critical Security Hardening
-- **Security**: Remove exposed API key from `.env` file (CEREBRAS_API_KEY) - never commit real keys to version control
-- **Security**: Add explicit JWT algorithm whitelist (ES256, RS256) to prevent algorithm substitution attacks in AWS ALB JWT verification
-- **Security**: Strengthen capability token validation - now fails hard in production if CAPABILITY_TOKEN_SECRET is not configured
-- **Security**: Add comprehensive file upload validation including size limits (configurable via FILE_UPLOAD_MAX_SIZE_MB), extension allowlisting, path traversal protection, and null byte checks
-- **Security**: Add Permissions-Policy security header to restrict browser features (geolocation, microphone, camera, payment, usb)
-- **Security**: Improve authentication failure logging - distinguish expected failures (warning level) from unexpected errors (error level) for better security monitoring
-- **Security**: Replace bare except clause in csv_reporter with specific exception handling (ValueError, TypeError)
-- **Security**: Update `.env.example` with comprehensive security documentation and production warnings
-- **Config**: Add file_upload_max_size_mb and file_upload_allowed_extensions settings to AppSettings
-- **Config**: Add security_permissions_policy_enabled and security_permissions_policy_value settings for Permissions-Policy header
-- **Fix**: Agent loop now handles models that don't properly set `finish: true` flag (e.g., Cerebras). Added fallback detection for `final_answer` without finish flag, and consecutive-think limit to prevent infinite loops.
-- **Feature**: Add `extract_pdf_text` tool to pdfbasic MCP server for actual PDF text extraction and summarization. The existing `analyze_pdf` tool only returns word frequency statistics; this new tool returns the actual text content so the LLM can summarize documents.
-- **Feature**: Add tool call content parser (`backend/modules/llm/tool_call_parser.py`) for models that don't support native function calling. When a model outputs tool calls as JSON in its text content (e.g., Cerebras outputs `{"cmd": [...]}` as text), the parser extracts and converts them to the proper tool_calls format. Supports multiple JSON formats (OpenAI-style, function/args, tool/parameters, and direct tool-name-as-key patterns).
-- **Feature**: Add automatic tool suggestion based on file attachments (`backend/application/chat/preprocessors/file_tool_suggester.py`). When users attach files (PDF, CSV, images, etc.), relevant tools are automatically selected. For example, attaching a PDF auto-selects `pdfbasic_extract_pdf_text` so the model can read and summarize the document without manual tool selection.
+### PR #197 - 2026-01-08
+- **Configuration**: Synchronized docker-compose.yml environment variables with .env.example. Added all missing feature flags, API keys, agent configuration, and other application settings to ensure Docker deployments have the same configuration options as local development.
+- **CI**: Updated test container build to include `.env.example` and `docker-compose.yml` so docker env sync tests can run.
 
 ### 2026-01-07 - Elicitation Routing Fix and Testing
 - **Fix**: Resolve elicitation dialog not appearing by switching from `contextvars.ContextVar` to dictionary-based routing. The MCP receive loop runs in a separate asyncio task that cannot access context variables set in the tool execution task. Now uses per-server routing with proper cross-task visibility.
