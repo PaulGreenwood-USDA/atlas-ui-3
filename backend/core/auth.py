@@ -12,6 +12,9 @@ from modules.config.config_manager import config_manager
 
 logger = logging.getLogger(__name__)
 
+# Security: Whitelist of allowed JWT algorithms to prevent algorithm substitution attacks
+_ALLOWED_JWT_ALGORITHMS = ["ES256", "RS256"]
+
 # Cache with TTL for ALB public keys: {(kid, region): (key, expiry_time)}
 _alb_key_cache: Dict[Tuple[str, str], Tuple[str, datetime]] = {}
 
@@ -97,6 +100,9 @@ def _get_alb_public_key(kid: str, aws_region: str) -> Optional[str]:
     # if AWS rotates keys or a key is compromised
     cache_key = (kid, aws_region)
     now = datetime.utcnow()
+    # Security: Algorithm whitelist - only allow RS256 for AWS ALB JWTs
+    _ALLOWED_JWT_ALGORITHMS = ["RS256"]
+    
     if cache_key in _alb_key_cache:
         cached_key, expiry = _alb_key_cache[cache_key]
         if now < expiry:
@@ -143,15 +149,21 @@ def get_user_from_aws_alb_jwt(encoded_jwt, expected_alb_arn, aws_region):
         header = jwt.get_unverified_header(encoded_jwt)
         kid = header.get('kid')
         received_alb_arn = header.get('signer')
+        alg = header.get('alg')
         
         if not kid:
             logger.error("Error: 'kid' not found in JWT header")
+            return None
+        
+        # Security: Validate algorithm before processing to prevent algorithm substitution attacks
+        if alg not in _ALLOWED_JWT_ALGORITHMS:
+            logger.error(f"Error: JWT algorithm {alg} not in whitelist {_ALLOWED_JWT_ALGORITHMS}")
             return None
 
         # Step 2: Validate the signer matches the expected ALB ARN
         # Security: hmac.compare_digest prevents timing attacks that could reveal the ARN
         if not received_alb_arn or not hmac.compare_digest(received_alb_arn, expected_alb_arn):
-            logger.error(f"Error: Invalid signer ARN. Expected {expected_alb_arn}, got {received_alb_arn}")
+            logger.warning(f"Auth failed: Invalid signer ARN. Expected {expected_alb_arn}, got {received_alb_arn}")
             return None
 
         # Step 3: Get the public key from the regional endpoint (with caching)
@@ -162,11 +174,11 @@ def get_user_from_aws_alb_jwt(encoded_jwt, expected_alb_arn, aws_region):
 
         # Step 4: Validate the signature and claims using PyJWT
         # The decode method handles signature verification and standard claims (like expiration)
-        # The ALB uses ES256 algorithm
+        # Security: Use explicit algorithm whitelist for defense in depth
         payload = jwt.decode(
             encoded_jwt,
             pub_key,
-            algorithms=['ES256'],
+            algorithms=_ALLOWED_JWT_ALGORITHMS,
             # Optional: Add audience or issuer validation if needed, though ALB handles most standard claims validation
             options={"verify_aud": False, "verify_iss": False}
         )
@@ -178,22 +190,22 @@ def get_user_from_aws_alb_jwt(encoded_jwt, expected_alb_arn, aws_region):
             # the email claim contains a properly formatted email address
             email_pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
             if not isinstance(email_address, str) or not re.match(email_pattern, email_address):
-                logger.error(f"Error: Invalid email format in JWT payload: {email_address}")
+                logger.warning(f"Auth failed: Invalid email format in JWT payload")
                 return None
-            logger.debug("Successfully authenticated user via AWS ALB JWT")
+            logger.info(f"Successfully authenticated user via AWS ALB JWT: {email_address}")
             return email_address
         else:
-            logger.error("Error: 'email' claim not found in JWT payload")
+            logger.warning("Auth failed: 'email' claim not found in JWT payload")
             return None
 
     except jwt.ExpiredSignatureError:
-        logger.error("Error: Token has expired")
+        logger.warning("Auth failed: JWT token expired")
         return None
     except jwt.InvalidTokenError as e:
-        logger.error(f"Error: Invalid token - {e}")
+        logger.warning(f"Auth failed: Invalid JWT token - {e}")
         return None
     except Exception as e:
-        logger.error(f"An unexpected error occurred: {e}")
+        logger.error(f"Auth failed: Unexpected error during JWT validation - {e}", exc_info=True)
         return None
 
 
@@ -202,3 +214,4 @@ def get_user_from_header(x_email_header: Optional[str]) -> Optional[str]:
     if not x_email_header:
         return None
     return x_email_header.strip()
+

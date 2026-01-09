@@ -1,4 +1,11 @@
 models:  
+  usda-internal:
+    model_url: "https://api.usda.usai.gov/v1/chat/completions"
+    model_name: "gpt-oss-120b"
+    api_key: "${USDA_API_KEY}"
+    description: "USDA Internal LLM API"
+    compliance_level: "Internal"
+
   openrouter-gpt-oss:
     model_url: "https://openrouter.ai/api/v1/chat/completions"
     model_name: "openai/gpt-oss-120b"

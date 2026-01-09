@@ -5,6 +5,7 @@ Sets common security headers:
  - X-Frame-Options (XFO)
  - X-Content-Type-Options: nosniff
  - Referrer-Policy
+ - Permissions-Policy
 
 Each header is individually togglable via AppSettings. HSTS is intentionally omitted.
 """
@@ -47,5 +48,15 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
             csp_value = getattr(self.settings, "security_csp_value", None)
             if csp_value and "Content-Security-Policy" not in response.headers:
                 response.headers["Content-Security-Policy"] = csp_value
+        
+        # Permissions-Policy (restricts browser features)
+        if getattr(self.settings, "security_permissions_policy_enabled", True):
+            permissions_value = getattr(
+                self.settings, 
+                "security_permissions_policy_value", 
+                "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+            )
+            if permissions_value and "Permissions-Policy" not in response.headers:
+                response.headers["Permissions-Policy"] = permissions_value
 
         return response

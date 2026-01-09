@@ -288,6 +288,18 @@ class AppSettings(BaseSettings):
     s3_timeout: int = 30
     s3_use_ssl: bool = False
     
+    # File upload security settings
+    file_upload_max_size_mb: int = Field(
+        default=100,
+        description="Maximum file upload size in megabytes",
+        validation_alias="FILE_UPLOAD_MAX_SIZE_MB"
+    )
+    file_upload_allowed_extensions: Optional[List[str]] = Field(
+        default=None,
+        description="Allowed file extensions (if None, all are allowed). Example: ['.pdf', '.txt', '.csv']",
+        validation_alias="FILE_UPLOAD_ALLOWED_EXTENSIONS"
+    )
+    
     # Feature flags
     feature_workspaces_enabled: bool = False
     feature_rag_enabled: bool = False
@@ -334,6 +346,11 @@ class AppSettings(BaseSettings):
     security_nosniff_enabled: bool = Field(default=True, validation_alias="SECURITY_NOSNIFF_ENABLED")
     security_referrer_policy_enabled: bool = Field(default=True, validation_alias="SECURITY_REFERRER_POLICY_ENABLED")
     security_referrer_policy_value: str = Field(default="no-referrer", validation_alias="SECURITY_REFERRER_POLICY_VALUE")
+    security_permissions_policy_enabled: bool = Field(default=True, validation_alias="SECURITY_PERMISSIONS_POLICY_ENABLED")
+    security_permissions_policy_value: str = Field(
+        default="geolocation=(), microphone=(), camera=(), payment=(), usb=()",
+        validation_alias="SECURITY_PERMISSIONS_POLICY_VALUE"
+    )
 
     # Prompt / template settings
     prompt_base_path: str = "prompts"  # Relative or absolute path to directory containing prompt templates

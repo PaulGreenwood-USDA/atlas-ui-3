@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Optional
 
 from interfaces.llm import LLMProtocol, LLMResponse
@@ -8,6 +9,8 @@ from modules.prompts.prompt_provider import PromptProvider
 
 from .protocols import AgentContext, AgentEvent, AgentEventHandler, AgentLoopProtocol, AgentResult
 from ..utilities import error_utils, tool_utils
+
+logger = logging.getLogger(__name__)
 
 
 class ThinkActAgentLoop(AgentLoopProtocol):
@@ -92,21 +95,53 @@ class ThinkActAgentLoop(AgentLoopProtocol):
                 return json.loads(resp.content or "{}")
             except Exception:
                 return {}
+        
+        def should_finish(think_args: Dict[str, Any], resp: LLMResponse, consecutive_thinks: int) -> tuple[bool, Optional[str]]:
+            """Determine if the agent should finish, with fallbacks for models that don't set finish flag.
+            
+            Returns:
+                Tuple of (should_finish, final_answer)
+            """
+            # Explicit finish flag set
+            if think_args.get("finish"):
+                return True, think_args.get("final_answer") or resp.content
+            
+            # Model provided a final_answer but didn't set finish=True (common with some models)
+            if think_args.get("final_answer"):
+                logger.debug("Model provided final_answer without finish=True, treating as finished")
+                return True, think_args.get("final_answer")
+            
+            # Fallback: If model has been thinking without taking action for too long,
+            # and has content, use that as the answer (prevents infinite loops)
+            max_consecutive_thinks = 3
+            if consecutive_thinks >= max_consecutive_thinks and resp.content:
+                logger.warning(
+                    f"Agent hit {consecutive_thinks} consecutive thinks without action or finish. "
+                    "Using last response as final answer (model may not support finish flag properly)."
+                )
+                return True, resp.content
+            
+            return False, None
 
         # Emit a synthesized think text to UI
         async def emit_think(text: str, step: int) -> None:
             await event_handler(AgentEvent(type="agent_reason", payload={"message": text, "step": step}))
 
+        # Track consecutive thinks without action (for fallback detection)
+        consecutive_thinks = 0
+
         # First think - ALWAYS happens before entering the loop
         steps += 1
+        consecutive_thinks += 1
         await event_handler(AgentEvent(type="agent_turn_start", payload={"step": steps}))
         first_think = await self.llm.call_with_tools(model, messages, think_tools_schema, "required", temperature=temperature)
         think_args = parse_args(first_think)
         await emit_think(first_think.content or "", steps)
 
         # Check if we can finish immediately after first think
-        if think_args.get("finish"):
-            final_answer = think_args.get("final_answer") or first_think.content
+        finish_now, answer = should_finish(think_args, first_think, consecutive_thinks)
+        if finish_now:
+            final_answer = answer
 
         # Action loop - entered after first think
         while steps < max_steps and final_answer is None:
@@ -128,6 +163,8 @@ class ThinkActAgentLoop(AgentLoopProtocol):
                     )
 
                 if llm_response.has_tool_calls():
+                    # Reset consecutive thinks counter since we're taking action
+                    consecutive_thinks = 0
                     first_call = (llm_response.tool_calls or [None])[0]
                     if first_call is None:
                         final_answer = llm_response.content or ""
@@ -154,12 +191,16 @@ class ThinkActAgentLoop(AgentLoopProtocol):
 
             # Think after action
             steps += 1
+            consecutive_thinks += 1
             await event_handler(AgentEvent(type="agent_turn_start", payload={"step": steps}))
             think_resp = await self.llm.call_with_tools(model, messages, think_tools_schema, "required", temperature=temperature)
             think_args = parse_args(think_resp)
             await emit_think(think_resp.content or "", steps)
-            if think_args.get("finish"):
-                final_answer = think_args.get("final_answer") or think_resp.content
+            
+            # Check if we should finish (with fallback for models that don't set finish flag)
+            finish_now, answer = should_finish(think_args, think_resp, consecutive_thinks)
+            if finish_now:
+                final_answer = answer
                 break
 
         if not final_answer:

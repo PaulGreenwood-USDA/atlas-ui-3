@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional
 import litellm
 from litellm import acompletion
 from .models import LLMResponse
+from .tool_call_parser import extract_tool_calls_from_content, should_attempt_content_parsing
 from modules.config.config_manager import resolve_env_var
 
 logger = logging.getLogger(__name__)
@@ -241,6 +242,13 @@ class LiteLLMCaller:
         litellm_model = self._get_litellm_model_name(model_name)
         model_kwargs = self._get_model_kwargs(model_name, temperature)
         
+        # Extract available tool names for content parsing fallback
+        available_tools = [
+            tool.get("function", {}).get("name", "") 
+            for tool in tools_schema 
+            if tool.get("function", {}).get("name")
+        ]
+        
         # Handle tool_choice parameter - try "required" first, fallback to "auto" if unsupported
         final_tool_choice = tool_choice
 
@@ -257,14 +265,28 @@ class LiteLLMCaller:
             )
             
             message = response.choices[0].message
+            content = getattr(message, 'content', None) or ""
+            tool_calls = getattr(message, 'tool_calls', None)
+            
+            # If no tool_calls but content looks like it might have embedded tool calls,
+            # try to parse them from the content (for models that don't support native function calling)
+            if not tool_calls and content and should_attempt_content_parsing(content):
+                logger.info("No native tool_calls returned, attempting to parse tool calls from content")
+                parsed_tool_calls, cleaned_content = extract_tool_calls_from_content(content, available_tools)
+                
+                if parsed_tool_calls:
+                    logger.info(f"Extracted {len(parsed_tool_calls)} tool call(s) from content")
+                    # Convert parsed tool calls to the format expected by LLMResponse
+                    tool_calls = self._convert_parsed_tool_calls(parsed_tool_calls)
+                    content = cleaned_content
 
-            if tool_choice == "required" and not getattr(message, 'tool_calls', None):
+            if tool_choice == "required" and not tool_calls:
                 logger.error(f"LLM failed to return tool calls when tool_choice was 'required'. Full response: {response}")
                 raise ValueError("LLM failed to return tool calls when tool_choice was 'required'.")
 
             return LLMResponse(
-                content=getattr(message, 'content', None) or "",
-                tool_calls=getattr(message, 'tool_calls', None),
+                content=content,
+                tool_calls=tool_calls,
                 model_used=model_name
             )
             
@@ -347,6 +369,24 @@ class LiteLLMCaller:
             logger.error(f"Error in RAG+tools integrated query: {exc}")
             # Fallback to tools-only call
             return await self.call_with_tools(model_name, messages, tools_schema, tool_choice, temperature=temperature)
+    
+    def _convert_parsed_tool_calls(self, parsed_tool_calls: List[Dict]) -> List:
+        """Convert parsed tool call dicts to objects compatible with LiteLLM response format.
+        
+        This creates simple objects that mimic the LiteLLM tool call structure
+        for compatibility with downstream code that expects tool_calls from an LLM response.
+        """
+        class ParsedToolCall:
+            """Simple class to mimic LiteLLM tool call structure."""
+            def __init__(self, call_dict):
+                self.type = call_dict.get("type", "function")
+                self.id = call_dict.get("id", "")
+                self.function = type('Function', (), {
+                    'name': call_dict.get("function", {}).get("name", ""),
+                    'arguments': call_dict.get("function", {}).get("arguments", "{}")
+                })()
+        
+        return [ParsedToolCall(tc) for tc in parsed_tool_calls]
     
     def _format_rag_metadata(self, metadata) -> str:
         """Format RAG metadata into a user-friendly summary."""

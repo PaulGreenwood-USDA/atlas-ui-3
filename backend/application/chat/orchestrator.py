@@ -15,6 +15,7 @@ from modules.prompts.prompt_provider import PromptProvider
 from .policies.tool_authorization import ToolAuthorizationService
 from .preprocessors.prompt_override_service import PromptOverrideService
 from .preprocessors.message_builder import MessageBuilder
+from .preprocessors.file_tool_suggester import FileToolSuggester
 from .modes.plain import PlainModeRunner
 from .modes.rag import RagModeRunner
 from .modes.tools import ToolsModeRunner
@@ -73,6 +74,7 @@ class ChatOrchestrator:
         self.tool_authorization = ToolAuthorizationService(tool_manager=tool_manager)
         self.prompt_override = PromptOverrideService(tool_manager=tool_manager)
         self.message_builder = MessageBuilder(prompt_provider=prompt_provider)
+        self.file_tool_suggester = FileToolSuggester(tool_manager=tool_manager)
         
         # Initialize or use provided mode runners
         self.plain_mode = plain_mode or PlainModeRunner(
@@ -166,29 +168,38 @@ class ChatOrchestrator:
             selected_prompts=selected_prompts
         )
         
+        # Auto-suggest tools based on attached files
+        # This adds relevant tools (e.g., PDF tools for PDF files) if not already selected
+        effective_tools = self.file_tool_suggester.suggest_tools(
+            files=files,
+            user_selected_tools=selected_tools
+        )
+        if effective_tools and effective_tools != selected_tools:
+            logger.info(f"Auto-suggested tools based on files: {set(effective_tools or []) - set(selected_tools or [])}")
+        
         # Route to appropriate mode
         if agent_mode and self.agent_mode:
             return await self.agent_mode.run(
                 session=session,
                 model=model,
                 messages=messages,
-                selected_tools=selected_tools,
+                selected_tools=effective_tools,
                 selected_data_sources=selected_data_sources,
                 max_steps=kwargs.get("agent_max_steps", 30),
                 temperature=temperature,
                 agent_loop_strategy=kwargs.get("agent_loop_strategy"),
             )
-        elif selected_tools and not only_rag:
+        elif effective_tools and not only_rag:
             # Apply tool authorization
-            selected_tools = await self.tool_authorization.filter_authorized_tools(
-                selected_tools=selected_tools,
+            authorized_tools = await self.tool_authorization.filter_authorized_tools(
+                selected_tools=effective_tools,
                 user_email=user_email
             )
             return await self.tools_mode.run(
                 session=session,
                 model=model,
                 messages=messages,
-                selected_tools=selected_tools,
+                selected_tools=authorized_tools,
                 selected_data_sources=selected_data_sources,
                 user_email=user_email,
                 tool_choice_required=tool_choice_required,

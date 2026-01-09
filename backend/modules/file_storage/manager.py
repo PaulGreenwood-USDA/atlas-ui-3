@@ -6,8 +6,10 @@ This module provides utilities for:
 - File categorization  
 - File metadata management
 - Integration with S3 storage
+- File upload validation and security checks
 """
 
+import base64
 import logging
 from typing import Dict, List, Optional, Any
 from .s3_client import S3StorageClient
@@ -101,6 +103,57 @@ class FileManager:
         file_ext = self.get_file_extension(filename).lower()
         return file_ext in canvas_extensions
     
+    def validate_file_upload(self, filename: str, content_base64: str) -> None:
+        """Validate file upload meets security requirements.
+        
+        Args:
+            filename: Name of the file being uploaded
+            content_base64: Base64 encoded file content
+            
+        Raises:
+            ValueError: If file fails validation (size too large, disallowed extension, etc.)
+        """
+        try:
+            from modules.config import config_manager
+            settings = config_manager.app_settings
+            
+            # Validate file size
+            try:
+                file_size_bytes = len(base64.b64decode(content_base64))
+            except Exception:
+                raise ValueError("Invalid base64 encoded file content")
+            
+            max_size_bytes = settings.file_upload_max_size_mb * 1024 * 1024
+            if file_size_bytes > max_size_bytes:
+                raise ValueError(
+                    f"File size ({file_size_bytes / 1024 / 1024:.2f} MB) exceeds "
+                    f"maximum allowed size ({settings.file_upload_max_size_mb} MB)"
+                )
+            
+            # Validate file extension if allowlist is configured
+            allowed_extensions = settings.file_upload_allowed_extensions
+            if allowed_extensions:
+                file_ext = self.get_file_extension(filename).lower()
+                if file_ext not in [ext.lower() for ext in allowed_extensions]:
+                    raise ValueError(
+                        f"File extension '{file_ext}' not allowed. "
+                        f"Allowed extensions: {', '.join(allowed_extensions)}"
+                    )
+            
+            # Additional security: Check for null bytes in filename
+            if '\x00' in filename:
+                raise ValueError("Filename contains invalid null byte")
+            
+            # Check for path traversal attempts
+            if '..' in filename or '/' in filename or '\\' in filename:
+                raise ValueError("Filename contains invalid path characters")
+                
+        except ValueError:
+            raise
+        except Exception as e:
+            logger.error(f"Error during file upload validation: {e}")
+            raise ValueError(f"File validation failed: {e}")
+    
     async def upload_file(
         self,
         user_email: str,
@@ -109,7 +162,10 @@ class FileManager:
         source_type: str = "user",
         tags: Optional[Dict[str, str]] = None
     ) -> Dict[str, Any]:
-        """Upload a file with automatic content type detection."""
+        """Upload a file with automatic content type detection and security validation."""
+        # Security: Validate file before upload
+        self.validate_file_upload(filename, content_base64)
+        
         content_type = self.get_content_type(filename)
         
         return await self.s3_client.upload_file(

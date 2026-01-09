@@ -33,14 +33,24 @@ def _get_secret() -> bytes:
     Order of precedence:
     - App settings (config manager)
     - Fallback development secret (unsafe for production)
+    
+    Raises:
+        RuntimeError: If no secret is configured in production mode
     """
     try:
         settings = config_manager.app_settings
         if getattr(settings, "capability_token_secret", None):
             return settings.capability_token_secret.encode("utf-8")
-    except Exception:
-        # Config not ready; continue to fallback with a dev secret.
-        logger.debug("Capability token secret not available; using fallback dev secret.")
+        
+        # Security: Fail hard if no secret is set in production
+        if not settings.debug_mode:
+            raise RuntimeError(
+                "CAPABILITY_TOKEN_SECRET must be set for production. "
+                "Generate a secure random secret and set it in your environment."
+            )
+    except Exception as e:
+        if "debug_mode" not in str(e):  # Re-raise RuntimeError from above
+            logger.debug(f"Capability token secret not available: {e}")
 
     logger.warning("Using fallback dev capability token secret. Set CAPABILITY_TOKEN_SECRET for security.")
     return b"dev-capability-secret"

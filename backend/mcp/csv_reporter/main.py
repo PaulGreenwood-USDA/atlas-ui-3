@@ -481,8 +481,8 @@ def plot_time_series(
             if not pd.api.types.is_numeric_dtype(plot_df[col]):
                 try:
                     plot_df[col] = pd.to_numeric(plot_df[col], errors='coerce')
-                except:
-                    return {"results": {"error": f"Column '{col}' cannot be converted to numeric values."}}
+                except (ValueError, TypeError) as e:
+                    return {"results": {"error": f"Column '{col}' cannot be converted to numeric values: {e}"}}
 
         # Create the plot
         plt.figure(figsize=(12, 8))

@@ -389,6 +389,137 @@ def generate_report_about_pdf(
         }
 
 
+def _extract_pdf_text(filename: str, original_filename: Optional[str] = None, max_chars: int = 50000) -> Dict[str, Any]:
+    """
+    Extract text content from a PDF file for reading/summarization.
+    
+    Args:
+        filename: The PDF file path, URL, or base64 data.
+        original_filename: The original name of the file.
+        max_chars: Maximum characters to return (default 50000).
+
+    Returns:
+        A dictionary containing the extracted text or an error message.
+    """
+    try:
+        # Validate that the filename is for a PDF
+        if not (filename.lower().endswith('.pdf') or (original_filename and original_filename.lower().endswith('.pdf'))):
+            return {"results": {"error": "Invalid file type. This tool only accepts PDF files."}}
+
+        # Check if filename is a URL (absolute or relative)
+        is_url = (
+            filename.startswith("http://") or
+            filename.startswith("https://") or
+            filename.startswith("/api/") or
+            filename.startswith("/")
+        )
+
+        if is_url:
+            # Convert relative URLs to absolute URLs
+            if filename.startswith("/"):
+                backend_url = os.getenv("BACKEND_URL", "http://localhost:8000")
+                url = f"{backend_url}{filename}"
+            else:
+                url = filename
+
+            logger.info(f"Extracting text from PDF URL: {url}")
+            response = requests.get(url, timeout=30)
+            response.raise_for_status()
+            pdf_stream = io.BytesIO(response.content)
+        else:
+            # Assume it's base64-encoded data
+            decoded_bytes = base64.b64decode(filename)
+            pdf_stream = io.BytesIO(decoded_bytes)
+        
+        reader = PdfReader(pdf_stream)
+        
+        full_text = ""
+        page_count = len(reader.pages)
+        
+        for i, page in enumerate(reader.pages):
+            page_text = page.extract_text()
+            if page_text:
+                full_text += f"\n--- Page {i + 1} ---\n"
+                full_text += page_text
+            
+            # Stop if we've exceeded max_chars
+            if len(full_text) > max_chars:
+                full_text = full_text[:max_chars]
+                truncated = True
+                break
+        else:
+            truncated = False
+
+        if not full_text.strip():
+            return {
+                "results": {
+                    "operation": "pdf_text_extraction",
+                    "filename": original_filename or filename,
+                    "status": "Success",
+                    "message": "PDF contained no extractable text. The document may be scanned images or have security restrictions.",
+                    "page_count": page_count,
+                    "text": ""
+                }
+            }
+
+        return {
+            "results": {
+                "operation": "pdf_text_extraction",
+                "filename": original_filename or filename,
+                "page_count": page_count,
+                "character_count": len(full_text),
+                "truncated": truncated,
+                "text": full_text
+            }
+        }
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return {"results": {"error": f"PDF text extraction failed: {str(e)}"}}
+
+
+@mcp.tool
+def extract_pdf_text(
+    instructions: Annotated[str, "What you want to do with the text (e.g., 'summarize', 'find key points', 'extract conclusions')"],
+    filename: Annotated[str, "The name of the PDF file to read"],
+    original_filename: Optional[str] = None,
+    max_chars: Annotated[int, "Maximum characters to extract (default 50000)"] = 50000
+) -> Dict[str, Any]:
+    """
+    Extract the full text content from a PDF document for reading, summarization, or analysis.
+
+    USE THIS TOOL when you need to:
+    - Summarize a PDF document
+    - Read and understand PDF content
+    - Find specific information in a PDF
+    - Answer questions about a PDF's content
+    - Extract key points, conclusions, or findings from a PDF
+
+    This tool extracts the actual text from all pages of a PDF and returns it so you can
+    read, analyze, and summarize the content. The text is returned with page markers.
+
+    Note: This is different from analyze_pdf which only returns word frequency statistics.
+    Use this tool when you need the actual content to read or summarize.
+
+    Args:
+        instructions: What you want to do with the text (helps with logging/context)
+        filename: PDF file name (must end with .pdf extension)
+        original_filename: The original name of the file if different from filename
+        max_chars: Maximum characters to extract (default 50000, increase for longer documents)
+
+    Returns:
+        Dictionary containing:
+        - operation: "pdf_text_extraction"
+        - filename: Source PDF file name  
+        - page_count: Number of pages in the document
+        - character_count: Number of characters extracted
+        - truncated: Whether the text was truncated due to max_chars limit
+        - text: The extracted text content with page markers
+    """
+    logger.info(f"Extracting PDF text for: {instructions}")
+    return _extract_pdf_text(filename, original_filename, max_chars)
+
 
 if __name__ == "__main__":
     mcp.run()
