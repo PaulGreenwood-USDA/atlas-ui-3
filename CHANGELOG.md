@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### 2026-01-09 - Recreation Status MCP Server
+- **New MCP Server**: Added `recreation_status` MCP server for Pisgah and Nantahala National Forests recreation information.
+  - `get_trail_conditions`: Trail status, conditions, closures, difficulty ratings
+  - `get_campground_status`: Campground availability, amenities, reservation info
+  - `get_recreation_alerts`: Active closures, advisories, and safety warnings
+  - `get_recreation_area_info`: Detailed info for specific trails or campgrounds
+  - `list_recreation_areas`: List all trails and campgrounds by type/forest
+  - `get_recreation_summary`: Comprehensive recreation conditions overview with recommendations
+
 ### 2026-01-09 - Weather & Fire MCP Server
 - **New MCP Server**: Added `weather_fire` MCP server for USDA Forest Service weather and fire conditions monitoring.
   - `get_weather_forecast`: NWS forecasts for Pisgah/Nantahala National Forests ranger districts

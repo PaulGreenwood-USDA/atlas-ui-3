@@ -178,5 +178,20 @@
     "short_description": "Weather and fire conditions",
     "help_email": "support@fs.usda.gov",
     "compliance_level": "Public"
+  },
+  "recreation_status": {
+    "command": [
+      "python",
+      "mcp/recreation_status/main.py"
+    ],
+    "cwd": "backend",
+    "groups": [
+      "users"
+    ],
+    "description": "Recreation status for Pisgah and Nantahala National Forests. Check trail conditions, campground availability, recreation alerts, and area information for hiking, camping, and outdoor activities in Western NC.",
+    "author": "USDA Forest Service",
+    "short_description": "Trail and campground status",
+    "help_email": "support@fs.usda.gov",
+    "compliance_level": "Public"
   }
 }
