@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### 2026-01-09 - Weather & Fire MCP Server
+- **New MCP Server**: Added `weather_fire` MCP server for USDA Forest Service weather and fire conditions monitoring.
+  - `get_weather_forecast`: NWS forecasts for Pisgah/Nantahala National Forests ranger districts
+  - `get_fire_weather_alerts`: Red Flag Warnings and fire weather alerts by state
+  - `get_active_fires`: Active wildfire incidents from NIFC/ArcGIS
+  - `get_fire_danger_rating`: Estimated fire danger based on current conditions
+  - `get_forest_conditions_summary`: Comprehensive briefing for morning situational awareness
+  - `list_monitoring_locations`: Available preset locations (Supervisor Office, all ranger districts)
+
 ### PR #197 - 2026-01-08
 - **Configuration**: Synchronized docker-compose.yml environment variables with .env.example. Added all missing feature flags, API keys, agent configuration, and other application settings to ensure Docker deployments have the same configuration options as local development.
 - **CI**: Updated test container build to include `.env.example` and `docker-compose.yml` so docker env sync tests can run.

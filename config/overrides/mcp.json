@@ -163,5 +163,20 @@
     "short_description": "User elicitation demonstration",
     "help_email": "support@example.com",
     "compliance_level": "Public"
+  },
+  "weather_fire": {
+    "command": [
+      "python",
+      "mcp/weather_fire/main.py"
+    ],
+    "cwd": "backend",
+    "groups": [
+      "users"
+    ],
+    "description": "Weather and fire conditions for USDA Forest Service. Get NWS forecasts, fire weather alerts, Red Flag Warnings, active wildfire incidents, and fire danger ratings for the Pisgah and Nantahala National Forests in Western NC.",
+    "author": "USDA Forest Service",
+    "short_description": "Weather and fire conditions",
+    "help_email": "support@fs.usda.gov",
+    "compliance_level": "Public"
   }
 }
