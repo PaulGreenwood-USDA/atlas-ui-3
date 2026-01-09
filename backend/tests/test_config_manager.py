@@ -4,6 +4,7 @@ Tests the centralized configuration management system without
 modifying the actual environment or configuration files.
 """
 
+import sys
 import pytest
 from pathlib import Path
 from backend.modules.config.config_manager import (
@@ -233,6 +234,10 @@ class TestResolveEnvVar:
         assert resolve_env_var("$VAR") == "$VAR"
         assert resolve_env_var("{VAR}") == "{VAR}"
 
+    @pytest.mark.skipif(
+        sys.platform == "win32",
+        reason="Windows environment variables are case-insensitive"
+    )
     def test_resolve_env_var_case_sensitive(self, monkeypatch):
         """Environment variable names should be case-sensitive."""
         monkeypatch.setenv("MY_VAR", "value1")

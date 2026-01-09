@@ -95,6 +95,9 @@ services:
       
       - CAPABILITY_TOKEN_SECRET=blablah
       
+      # File upload configuration
+      - FILE_UPLOAD_MAX_SIZE_MB=50
+      
       # S3/MinIO Storage Configuration
       - S3_ENDPOINT=http://minio:9000
       - S3_BUCKET_NAME=atlas-files
